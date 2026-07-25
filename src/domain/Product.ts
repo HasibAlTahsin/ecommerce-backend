@@ -24,8 +24,8 @@ throw new InsufficientStockError(this.id, quantity, this._stock);
 
 /** 
 * This is for in-memory check only. 
-* The actual stock will be reduced using the conditional SQL UPDATE in Part 4, because this method is not safe in concurrency or race conditions.
-* This must be mentioned in the interview.
+* The actual stock will be reduced using the conditional SQL UPDATE, because this method is not safe in concurrency or race conditions.\
+* This method in the domain layer is merely an advisory pre-check; the actual authoritative logic resides in the database query: `UPDATE ... WHERE stock >= qty`.
 */
 reduceStock(quantity: number): void {
 this.assertPurchasable(quantity);
