@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 async function main() {
   await prisma.user.createMany({
     data: [
-      { email: 'admin@example.com', passwordHash: await argon2.hash('Admin123!'), role: 'ADMIN' },
-      { email: 'user@example.com',  passwordHash: await argon2.hash('User123!'),  role: 'CUSTOMER' },
+      { email: 'admin@example.com', passwordHash: await argon2.hash('Admin123!'), role: 'ADMIN', isVerified: true },
+      { email: 'user@example.com',  passwordHash: await argon2.hash('User123!'),  role: 'CUSTOMER', isVerified: true },
     ],
     skipDuplicates: true,
   });

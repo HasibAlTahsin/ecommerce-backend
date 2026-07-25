@@ -42,6 +42,7 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   role         Role     @default(CUSTOMER)
+  isVerified   Boolean  @default(false) @map("is_verified")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
