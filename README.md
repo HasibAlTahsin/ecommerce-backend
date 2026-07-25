@@ -171,6 +171,34 @@ curl -X POST http://localhost:3000/api/webhooks/mock \
   -d "$PAYLOAD"
 ```
 
+### 5. Testing Real Stripe Webhooks Locally
+Stripe only delivers webhooks to a public HTTPS URL, so a local server needs a tunnel. Two approaches are supported:
+
+**Option A — ngrok (public URL, works for any provider):**
+```bash
+ngrok http 3000
+# Copy the HTTPS forwarding URL, e.g. https://xxxx.ngrok-free.dev
+```
+In the Stripe Dashboard → Event destinations → Add destination, set the URL to
+`https://xxxx.ngrok-free.dev/api/webhooks/stripe`, listening to `payment_intent.succeeded`
+and `payment_intent.payment_failed`. Copy the endpoint's signing secret into
+`STRIPE_WEBHOOK_SECRET` in `.env` and restart the server. Inspect traffic at
+`http://127.0.0.1:4040`.
+
+> ngrok's free tier issues a new URL on each restart — update the Stripe endpoint accordingly.
+
+**Option B — Stripe CLI (no public URL needed):**
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+# Prints its own whsec_... signing secret — put it in STRIPE_WEBHOOK_SECRET
+```
+Then trigger a test event in another terminal:
+```bash
+stripe trigger payment_intent.succeeded
+```
+The handler verifies the raw-body signature before any processing; an event whose
+`payment_intent` has no matching payment row is rejected, which is the correct behaviour.
+
 ---
 
 ## Architecture & Design Decisions
