@@ -35,7 +35,7 @@ This project implements the core backend infrastructure for an e-commerce platfo
 - **Webhook Idempotency:** Guarantees that duplicate or out-of-order webhook deliveries do not cause double-charging or double stock reduction.
 - **DFS Category Tree with Redis Caching:** Fetches category descendants via an iterative Depth-First Search, backed by Redis with a resilient database fallback and cycle protection.
 - **Clean Layered Architecture:** A pure OOP domain layer (`Money`, `Order`, `Product`) with zero I/O dependencies, keeping business logic isolated and unit-testable.
-- **Security First:** Argon2id password hashing, JWT authentication, non-root Docker containers, and Zod strict-input validation.
+- **Security First:** Argon2id password hashing, JWT authentication, rate limiting on auth and global routes, non-root Docker containers, and Zod strict-input validation.
 
 ---
 
@@ -197,6 +197,9 @@ Stripe signs the exact raw bytes of the request. If `express.json()` parses the 
 ### 6. Price snapshotting
 Order items store the price at order time. A later catalogue price change must not retroactively alter a placed order — a correctness requirement, not an optimisation.
 
+### 7. Rate limiting & proxy awareness
+Auth routes (`/api/auth`) carry a strict limiter (5 attempts per 15 minutes) to blunt brute-force and credential stuffing; all routes share a looser global limiter. Behind a reverse proxy in production the app sets `trust proxy`, so `req.ip` reflects the real client IP rather than the proxy's — essential for the limiter to key on the correct address. Limits use an in-memory store here; a multi-instance deployment would swap in a Redis-backed store so the count is shared across servers.
+
 ---
 
 ## Testing Strategy
@@ -217,7 +220,7 @@ Also covered: DFS cycle termination, cache-hit query elimination, and the Redis-
 
 ---
 
-## Known Constraints
+## nown Constraints
 
 - **Stripe:** Integrated and functional in **test mode**. Live keys are deliberately excluded from this repository; `STRIPE_SECRET_KEY` selects the key set from the environment.
 - **bKash:** Implemented against the documented tokenized-checkout contract. Live and sandbox access require Bangladeshi merchant onboarding credentials, which are not obtainable for this exercise, so `BkashStrategy` is driven by mocked HTTP in tests. Swapping in real credentials is a configuration change, not a code change.

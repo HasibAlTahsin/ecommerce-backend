@@ -12,21 +12,33 @@ import { buildPaymentRegistry } from './payments/bootstrap';
 import { WebhookService } from './application/WebhookService';
 import { StockRepository } from './infrastructure/prisma/StockRepository';
 import { mountSwagger } from './interfaces/http/swagger';
+import { authLimiter, globalLimiter } from './interfaces/http/middlewares/rateLimit';
 // Global patch to convert BigInt to JSON
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 const app = express();
+// Behind a reverse proxy in production, trust X-Forwarded-* so req.ip is the
+// real client IP (needed for correct rate limiting and logging).
+if (env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 // 1. Webhooks FIRST, with a raw body parser scoped to them only.
 app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRouter);
 // 2. Global JSON parser AFTER. Everything else gets a parsed body.
 app.use(express.json({ limit: '100kb' }));
 // 3. API docs (Swagger UI).
 mountSwagger(app);
+// 4. Rate limiting (skipped under test so the suite is not throttled).
+if (process.env.NODE_ENV !== 'test') {
+  app.use(globalLimiter);
+}
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
-app.use('/api/auth', authRouter);
+const authMiddlewares =
+  process.env.NODE_ENV !== 'test' ? [authLimiter, authRouter] : [authRouter];
+app.use('/api/auth', ...authMiddlewares);
 app.use('/api/products', productRouter);
 app.use('/api/orders', orderRouter);
 const treeService = new CategoryTreeService(prisma, redis);
