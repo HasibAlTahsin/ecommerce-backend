@@ -7,3 +7,4 @@ dist
 .agents/
 .windsurf/
 skills-lock.json
+*.deb
