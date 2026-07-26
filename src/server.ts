@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { env } from './config/env';
 import { authRouter } from './interfaces/http/routes/auth';
 import { orderRouter } from './interfaces/http/routes/orders';
@@ -23,6 +24,18 @@ const app = express();
 if (env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
+// CORS: allow the frontend origin(s) to call the API from the browser.
+// Comma-separated list in CORS_ORIGINS env var; falls back to allowing all in dev.
+const allowedOrigins = (process.env.CORS_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true,
+  }),
+);
 // 1. Webhooks FIRST, with a raw body parser scoped to them only.
 app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRouter);
 // 2. Global JSON parser AFTER. Everything else gets a parsed body.

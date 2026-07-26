@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orbit — E-Commerce Checkout</title>
+<script src="https://js.stripe.com/v3/"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --surface: #ffffff;
+    --ink: #16151a;
+    --ink-soft: #605c6b;
+    --line: #ece9e4;
+    --accent: #5b4bff;
+    --accent-soft: #efeafe;
+    --accent-ink: #3d2fd6;
+    --ok: #148a5a;
+    --ok-soft: #e4f5ec;
+    --danger: #c0392b;
+    --danger-soft: #fbeae8;
+    --shadow: 0 1px 2px rgba(20,18,28,.04), 0 12px 32px -12px rgba(20,18,28,.14);
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 12% -8%, #efeafe 0%, transparent 42%),
+      radial-gradient(circle at 92% 4%, #e9f6ff 0%, transparent 38%);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0; margin-bottom: 8px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #5b4bff, #8b5bff);
+    position: relative; flex: none;
+    box-shadow: 0 4px 14px -4px rgba(91,75,255,.6);
+  }
+  .logo::after {
+    content: ''; position: absolute; inset: 9px;
+    border: 2.5px solid #fff; border-radius: 50%;
+    border-right-color: transparent; border-bottom-color: transparent;
+    transform: rotate(45deg);
+  }
+  .brand h1 {
+    font-family: 'Space Grotesk', sans-serif; font-size: 20px;
+    font-weight: 700; letter-spacing: -.02em;
+  }
+  .brand span { color: var(--accent); }
+  .whoami {
+    font-size: 13.5px; color: var(--ink-soft); display: flex; align-items: center; gap: 12px;
+  }
+  .whoami b { color: var(--ink); font-weight: 550; }
+  .link-btn {
+    background: none; border: none; color: var(--accent-ink); font: inherit;
+    font-size: 13px; font-weight: 550; cursor: pointer; padding: 0;
+  }
+  .link-btn:hover { text-decoration: underline; }
+
+  /* stepper */
+  .stepper { display: flex; gap: 6px; margin: 6px 0 30px; }
+  .step-pill {
+    flex: 1; height: 4px; border-radius: 999px; background: var(--line);
+    overflow: hidden; position: relative;
+  }
+  .step-pill::after {
+    content: ''; position: absolute; inset: 0; background: var(--accent);
+    transform: scaleX(0); transform-origin: left; transition: transform .5s cubic-bezier(.4,0,.2,1);
+  }
+  .step-pill.done::after { transform: scaleX(1); }
+  .step-pill.active::after { transform: scaleX(.5); }
+
+  /* panels */
+  .panel { display: none; animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }
+  .panel.show { display: block; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .panel, .card, .toast { animation: none !important; }
+    .step-pill::after { transition: none; }
+  }
+
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent-ink); margin-bottom: 8px;
+  }
+  h2.title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700;
+    letter-spacing: -.03em; margin-bottom: 6px;
+  }
+  .sub { color: var(--ink-soft); font-size: 15px; margin-bottom: 26px; max-width: 46ch; }
+
+  /* auth card */
+  .auth-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 30px; max-width: 420px;
+  }
+  .tabs { display: flex; gap: 4px; background: var(--bg); padding: 4px; border-radius: 11px; margin-bottom: 22px; }
+  .tab {
+    flex: 1; border: none; background: none; font: inherit; font-size: 14px; font-weight: 550;
+    color: var(--ink-soft); padding: 9px; border-radius: 8px; cursor: pointer; transition: all .2s;
+  }
+  .tab.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  label { display: block; font-size: 13px; font-weight: 550; margin: 0 0 6px; color: var(--ink); }
+  input[type=email], input[type=password], input[type=text] {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+    font: inherit; font-size: 14.5px; background: var(--surface); color: var(--ink);
+    transition: border-color .15s, box-shadow .15s; margin-bottom: 15px;
+  }
+  input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .btn {
+    width: 100%; padding: 12px 18px; border: none; border-radius: 11px;
+    font: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer;
+    background: var(--ink); color: #fff; transition: transform .12s, box-shadow .2s, background .2s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px -8px rgba(20,18,28,.5); }
+  .btn:active:not(:disabled) { transform: translateY(0); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn.accent { background: var(--accent); }
+  .btn.accent:hover:not(:disabled) { box-shadow: 0 8px 22px -8px rgba(91,75,255,.7); }
+  .btn.ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+  .btn.ghost:hover:not(:disabled) { border-color: var(--ink-soft); box-shadow: none; }
+  .btn.sm { width: auto; padding: 8px 15px; font-size: 13px; border-radius: 9px; }
+
+  .hint { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+  .hint code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* products grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; display: flex; flex-direction: column; gap: 4px;
+    transition: transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s;
+    animation: rise .4s both;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: #ddd8f5; }
+  .card .thumb {
+    height: 96px; border-radius: 10px; margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--accent-soft), #e9f6ff);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; color: var(--accent-ink);
+    letter-spacing: -.02em;
+  }
+  .card .pname { font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+  .card .psku { font-size: 12px; color: var(--ink-soft); }
+  .card .prow { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+  .price { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 18px; letter-spacing: -.02em; }
+  .stock { font-size: 11.5px; color: var(--ok); background: var(--ok-soft); padding: 2px 8px; border-radius: 999px; font-weight: 550; }
+  .stock.low { color: #b8860b; background: #fdf5e3; }
+
+  /* cart */
+  .layout { display: grid; grid-template-columns: 1fr 340px; gap: 22px; align-items: start; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  .cart {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 22px; position: sticky; top: 20px;
+  }
+  .cart h3 { font-family: 'Space Grotesk', sans-serif; font-size: 17px; margin-bottom: 16px; letter-spacing: -.02em; }
+  .cart-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; gap: 10px; }
+  .cart-item:last-of-type { border-bottom: none; }
+  .qty { display: flex; align-items: center; gap: 9px; }
+  .qty button {
+    width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--surface); cursor: pointer; font-size: 15px; color: var(--ink); line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qty button:hover { border-color: var(--accent); color: var(--accent); }
+  .cart-empty { color: var(--ink-soft); font-size: 14px; text-align: center; padding: 24px 0; }
+  .total-row { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0; }
+  .total-row .price { font-size: 24px; }
+
+  /* payment */
+  .pay-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 30px; max-width: 460px;
+  }
+  #card-element { padding: 13px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
+  #card-element.StripeElement--focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .provider-pick { display: flex; gap: 10px; margin-bottom: 22px; }
+  .prov {
+    flex: 1; padding: 13px; border: 1.5px solid var(--line); border-radius: 12px; cursor: pointer;
+    text-align: center; font-weight: 550; font-size: 14px; transition: all .15s; background: var(--surface);
+  }
+  .prov.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+  .prov small { display: block; font-size: 11px; color: var(--ink-soft); font-weight: 400; margin-top: 2px; }
+  .prov.active small { color: var(--accent-ink); }
+
+  /* toast */
+  .toast-wrap { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast {
+    background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 11px; font-size: 13.5px; font-weight: 500;
+    box-shadow: 0 10px 30px -8px rgba(0,0,0,.4); animation: pop .3s cubic-bezier(.2,.8,.2,1) both; max-width: 90vw;
+  }
+  .toast.ok { background: var(--ok); }
+  .toast.err { background: var(--danger); }
+  @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+
+  .success-check {
+    width: 64px; height: 64px; border-radius: 50%; background: var(--ok-soft);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
+  }
+  .success-check svg { width: 30px; height: 30px; stroke: var(--ok); }
+
+  .muted { color: var(--ink-soft); font-size: 13px; }
+  .center { text-align: center; }
+  .mt { margin-top: 18px; }
+  .spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer { text-align: center; padding: 40px 0 30px; color: var(--ink-soft); font-size: 12.5px; }
+  footer code { background: var(--surface); border: 1px solid var(--line); padding: 2px 7px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo"></div>
+      <h1>Orbit<span>.</span></h1>
+    </div>
+    <div class="whoami" id="whoami"></div>
+  </header>
+
+  <div class="stepper" id="stepper">
+    <div class="step-pill" data-s="auth"></div>
+    <div class="step-pill" data-s="shop"></div>
+    <div class="step-pill" data-s="pay"></div>
+    <div class="step-pill" data-s="done"></div>
+  </div>
+
+  <!-- AUTH -->
+  <section class="panel" id="panel-auth">
+    <div class="eyebrow">Step 1 — Account</div>
+    <h2 class="title">Sign in to start shopping</h2>
+    <p class="sub">Create an account and confirm the 6-digit code, or sign in with the seeded demo customer.</p>
+    <div class="auth-card">
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Sign in</button>
+        <button class="tab" data-tab="register">Register</button>
+      </div>
+
+      <div id="tab-login">
+        <label>Email</label>
+        <input type="email" id="login-email" value="user@example.com" />
+        <label>Password</label>
+        <input type="password" id="login-password" value="User123!" />
+        <button class="btn accent" id="btn-login">Sign in</button>
+        <p class="hint mt">Seeded demo: <code>user@example.com</code> / <code>User123!</code></p>
+      </div>
+
+      <div id="tab-register" style="display:none">
+        <label>Email <span class="muted">(@gmail.com)</span></label>
+        <input type="email" id="reg-email" placeholder="you@gmail.com" />
+        <label>Password</label>
+        <input type="password" id="reg-password" placeholder="At least 8 characters" />
+        <button class="btn accent" id="btn-register">Create account</button>
+        <div id="verify-box" style="display:none" class="mt">
+          <label>Verification code</label>
+          <input type="text" id="reg-pin" placeholder="6-digit code from email" maxlength="6" />
+          <button class="btn" id="btn-verify">Verify &amp; continue</button>
+          <p class="hint mt">In dev, the code appears in the server log's Ethereal preview URL.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SHOP -->
+  <section class="panel" id="panel-shop">
+    <div class="eyebrow">Step 2 — Catalogue</div>
+    <h2 class="title">Pick your products</h2>
+    <p class="sub">Live catalogue from the backend. Add items to your cart, then head to checkout.</p>
+    <div class="layout">
+      <div class="grid" id="products"></div>
+      <aside class="cart">
+        <h3>Your cart</h3>
+        <div id="cart-items"><p class="cart-empty">Cart is empty</p></div>
+        <div class="total-row">
+          <span class="muted">Total</span>
+          <span class="price" id="cart-total">$0.00</span>
+        </div>
+        <button class="btn accent" id="btn-checkout" disabled>Proceed to checkout</button>
+      </aside>
+    </div>
+  </section>
+
+  <!-- PAY -->
+  <section class="panel" id="panel-pay">
+    <div class="eyebrow">Step 3 — Payment</div>
+    <h2 class="title">Complete your payment</h2>
+    <p class="sub">Choose a provider. Stripe uses live Elements (test mode); Mock confirms instantly for a credential-free demo.</p>
+    <div class="pay-card">
+      <div class="provider-pick">
+        <div class="prov active" data-prov="STRIPE">Stripe<small>Card via Elements</small></div>
+        <div class="prov" data-prov="MOCK">Mock<small>Instant demo</small></div>
+      </div>
+
+      <div id="stripe-fields">
+        <label>Card details</label>
+        <div id="card-element"></div>
+        <p class="hint">Test card: <code>4242 4242 4242 4242</code> · any future date · any CVC</p>
+      </div>
+
+      <div class="total-row mt">
+        <span class="muted">Amount due</span>
+        <span class="price" id="pay-total">$0.00</span>
+      </div>
+      <button class="btn accent" id="btn-pay">Pay now</button>
+      <button class="link-btn mt" id="btn-back" style="display:block;margin:14px auto 0">← Back to cart</button>
+    </div>
+  </section>
+
+  <!-- DONE -->
+  <section class="panel" id="panel-done">
+    <div class="pay-card center">
+      <div class="success-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <h2 class="title">Payment received</h2>
+      <p class="sub center" style="margin:0 auto 24px">Your order is confirmed and stock has been updated. A webhook processed the payment idempotently on the backend.</p>
+      <button class="btn accent" id="btn-again">Shop again</button>
+    </div>
+  </section>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<footer>
+  Orbit demo frontend · connects to the backend at <code id="api-label"></code><br/>
+  Set <code>window.API_BASE</code> and <code>window.STRIPE_PK</code> below to point at your API.
+</footer>
+
+<script>
+  // ====== CONFIG — change these two for your environment ======
+  // Backend base URL. For a local demo use http://localhost:3000.
+  // To reach a local backend from a deployed Vercel page, use your ngrok HTTPS URL.
+  window.API_BASE = window.API_BASE || 'http://localhost:3000';
+  // Your Stripe TEST publishable key (pk_test_...). Leave blank to use Mock only.
+  window.STRIPE_PK = window.STRIPE_PK || '';
+  // ============================================================
+
+  const API = window.API_BASE.replace(/\/$/, '');
+  document.getElementById('api-label').textContent = API;
+
+  const state = { token: null, email: null, products: [], cart: {}, provider: 'STRIPE', orderId: null };
+
+  // ---- helpers ----
+  const $ = (s) => document.querySelector(s);
+  const money = (minor) => '$' + (minor / 100).toFixed(2);
+  function toast(msg, kind) {
+    const t = document.createElement('div');
+    t.className = 'toast ' + (kind || '');
+    t.textContent = msg;
+    $('#toasts').appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 3200);
+  }
+  async function api(path, opts = {}) {
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
+    const res = await fetch(API + path, { ...opts, headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
+    return data;
+  }
+
+  // ---- stepper / panels ----
+  const steps = ['auth', 'shop', 'pay', 'done'];
+  function goto(step) {
+    steps.forEach((s) => $('#panel-' + s).classList.toggle('show', s === step));
+    const idx = steps.indexOf(step);
+    document.querySelectorAll('.step-pill').forEach((p, i) => {
+      p.classList.toggle('done', i < idx);
+      p.classList.toggle('active', i === idx);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ---- auth tabs ----
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((x) => x.classList.remove('active'));
+    t.classList.add('active');
+    const which = t.dataset.tab;
+    $('#tab-login').style.display = which === 'login' ? 'block' : 'none';
+    $('#tab-register').style.display = which === 'register' ? 'block' : 'none';
+  }));
+
+  // ---- login ----
+  $('#btn-login').addEventListener('click', async () => {
+    const btn = $('#btn-login');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Signing in…';
+    try {
+      const { token } = await api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: $('#login-email').value, password: $('#login-password').value }),
+      });
+      state.token = token; state.email = $('#login-email').value;
+      toast('Signed in', 'ok');
+      afterAuth();
+    } catch (e) { toast(e.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Sign in'; }
+  });
+
+  // ---- register + verify ----
+  $('#btn-register').addEventListener('click', async () => {
+    const btn = $('#btn-register');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
+    try {
+      await api('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email: $('#reg-email').value, password: $('#reg-password').value }),
+      });
+      $('#verify-box').style.display = 'block';
+      toast('Code sent — check the email (or server log)', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Create account'; }
+  });
+
+  $('#btn-verify').addEventListener('click', async () => {
+    const btn = $('#btn-verify');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Verifying…';
+    try {
+      await api('/api/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({ email: $('#reg-email').value, pin: $('#reg-pin').value }),
+      });
+      // auto sign-in after verify
+      const { token } = await api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: $('#reg-email').value, password: $('#reg-password').value }),
+      });
+      state.token = token; state.email = $('#reg-email').value;
+      toast('Verified & signed in', 'ok');
+      afterAuth();
+    } catch (e) { toast(e.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Verify & continue'; }
+  });
+
+  function afterAuth() {
+    $('#whoami').innerHTML = '<span><b>' + state.email + '</b></span><button class="link-btn" id="btn-logout">Sign out</button>';
+    $('#btn-logout').addEventListener('click', () => location.reload());
+    loadProducts();
+    goto('shop');
+  }
+
+  // ---- products ----
+  async function loadProducts() {
+    try {
+      const list = await api('/api/products');
+      state.products = list;
+      const grid = $('#products');
+      grid.innerHTML = '';
+      list.forEach((p, i) => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.style.animationDelay = (i * 40) + 'ms';
+        const low = p.stock <= 5;
+        el.innerHTML =
+          '<div class="thumb">' + (p.name || '?').slice(0, 2).toUpperCase() + '</div>' +
+          '<div class="pname">' + p.name + '</div>' +
+          
+          '<div class="prow"><span class="price">' + money(p.priceMinor) + '</span>' +
+          '<span class="stock ' + (low ? 'low' : '') + '">' + p.stock + ' in stock</span></div>' +
+          '<button class="btn sm ghost" style="margin-top:12px" data-add="' + p.publicId + '">Add to cart</button>';
+        grid.appendChild(el);
+      });
+      grid.querySelectorAll('[data-add]').forEach((b) =>
+        b.addEventListener('click', () => addToCart(b.dataset.add)));
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  function addToCart(publicId) {
+    state.cart[publicId] = (state.cart[publicId] || 0) + 1;
+    renderCart();
+    toast('Added to cart');
+  }
+  function changeQty(publicId, delta) {
+    state.cart[publicId] = (state.cart[publicId] || 0) + delta;
+    if (state.cart[publicId] <= 0) delete state.cart[publicId];
+    renderCart();
+  }
+  function renderCart() {
+    const box = $('#cart-items');
+    const ids = Object.keys(state.cart);
+    if (ids.length === 0) {
+      box.innerHTML = '<p class="cart-empty">Cart is empty</p>';
+      $('#cart-total').textContent = '$0.00';
+      $('#btn-checkout').disabled = true;
+      return;
+    }
+    let total = 0;
+    box.innerHTML = '';
+    ids.forEach((id) => {
+      const p = state.products.find((x) => x.publicId === id);
+      const qty = state.cart[id];
+      total += p.priceMinor * qty;
+      const row = document.createElement('div');
+      row.className = 'cart-item';
+      row.innerHTML =
+        '<span>' + p.name + '</span>' +
+        '<span class="qty"><button data-dec="' + id + '">−</button>' + qty +
+        '<button data-inc="' + id + '">+</button></span>';
+      box.appendChild(row);
+    });
+    box.querySelectorAll('[data-inc]').forEach((b) => b.addEventListener('click', () => changeQty(b.dataset.inc, 1)));
+    box.querySelectorAll('[data-dec]').forEach((b) => b.addEventListener('click', () => changeQty(b.dataset.dec, -1)));
+    $('#cart-total').textContent = money(total);
+    $('#btn-checkout').disabled = false;
+  }
+
+  // ---- checkout: create order, go to pay ----
+  $('#btn-checkout').addEventListener('click', async () => {
+    const items = Object.entries(state.cart).map(([productPublicId, quantity]) => ({ productPublicId, quantity }));
+    if (!items.length) return;
+    const btn = $('#btn-checkout');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating order…';
+    try {
+      const order = await api('/api/orders', { method: 'POST', body: JSON.stringify({ items }) });
+      state.orderId = order.publicId;
+      $('#pay-total').textContent = money(order.totalMinor);
+      goto('pay');
+      setupProviderUI();
+    } catch (e) { toast(e.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Proceed to checkout'; }
+  });
+
+  // ---- provider selection ----
+  let stripe = null, cardEl = null;
+  document.querySelectorAll('.prov').forEach((p) => p.addEventListener('click', () => {
+    document.querySelectorAll('.prov').forEach((x) => x.classList.remove('active'));
+    p.classList.add('active');
+    state.provider = p.dataset.prov;
+    $('#stripe-fields').style.display = state.provider === 'STRIPE' ? 'block' : 'none';
+  }));
+
+  function setupProviderUI() {
+    if (window.STRIPE_PK && !stripe) {
+      stripe = Stripe(window.STRIPE_PK);
+      const elements = stripe.elements();
+      cardEl = elements.create('card', { style: { base: { fontFamily: 'Inter, sans-serif', fontSize: '15px', color: '#16151a' } } });
+      cardEl.mount('#card-element');
+    }
+    if (!window.STRIPE_PK) {
+      // No Stripe key configured → default to Mock
+      document.querySelector('.prov[data-prov="MOCK"]').click();
+      document.querySelector('.prov[data-prov="STRIPE"]').style.opacity = '.5';
+    }
+  }
+
+  $('#btn-back').addEventListener('click', () => goto('shop'));
+
+  // ---- pay ----
+  $('#btn-pay').addEventListener('click', async () => {
+    const btn = $('#btn-pay');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Processing…';
+    try {
+      const payload = await api('/api/orders/' + state.orderId + '/checkout', {
+        method: 'POST', body: JSON.stringify({ provider: state.provider }),
+      });
+
+      if (state.provider === 'STRIPE') {
+        if (!window.STRIPE_PK) throw new Error('Stripe publishable key not configured');
+        const result = await stripe.confirmCardPayment(payload.clientSecret, {
+          payment_method: { card: cardEl },
+        });
+        if (result.error) throw new Error(result.error.message);
+        // Payment confirmed on Stripe; the webhook will finalize the order server-side.
+        toast('Payment confirmed — finalizing…', 'ok');
+        goto('done');
+      } else {
+        // MOCK: simulate the provider webhook to finalize (demo only)
+        toast('Mock payment initiated', 'ok');
+        goto('done');
+      }
+    } catch (e) { toast(e.message, 'err'); }
+    finally { btn.disabled = false; btn.textContent = 'Pay now'; }
+  });
+
+  $('#btn-again').addEventListener('click', () => location.reload());
+
+  // ---- init ----
+  goto('auth');
+</script>
+</body>
+</html>
