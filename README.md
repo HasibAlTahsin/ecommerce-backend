@@ -37,6 +37,7 @@ This project implements the core backend infrastructure for an e-commerce platfo
 - **Clean Layered Architecture:** A pure OOP domain layer (`Money`, `Order`, `Product`) with zero I/O dependencies, keeping business logic isolated and unit-testable.
 - **Email Verification:** Registration sends a 6-digit PIN (via Nodemailer) that must be confirmed before login; unverified accounts are blocked. Uses Ethereal test SMTP in dev with zero credentials, real SMTP in production via env vars.
 - **Security First:** Argon2id password hashing, JWT authentication, rate limiting on auth and global routes, non-root Docker containers, and Zod strict-input validation.
+- **Checkout Frontend (Vercel):** A polished single-page frontend (`frontend/`) with Stripe Elements walks the full flow — auth + PIN verification, live catalogue, cart, checkout, and payment — deployed on Vercel.
 
 ---
 
@@ -198,6 +199,32 @@ stripe trigger payment_intent.succeeded
 ```
 The handler verifies the raw-body signature before any processing; an event whose
 `payment_intent` has no matching payment row is rejected, which is the correct behaviour.
+
+---
+
+## Frontend (Vercel)
+
+A polished single-page checkout frontend lives in `frontend/index.html` (vanilla HTML/CSS/JS,
+Stripe Elements). It walks through the full flow: sign in / register + PIN verification →
+browse the live catalogue → cart → checkout → pay (Stripe Elements or Mock) → confirmation.
+
+**Run locally:**
+```bash
+npx serve frontend      # serves on a local port
+```
+Open the printed URL. With the backend running on `http://localhost:3000`, sign in with the
+seeded customer (`user@example.com` / `User123!`) and the catalogue loads from the API.
+
+**Configuration** — two globals at the bottom of `index.html`:
+- `window.API_BASE` — backend base URL (defaults to `http://localhost:3000`; set to your
+  ngrok HTTPS URL to reach a local backend from the deployed page).
+- `window.STRIPE_PK` — your Stripe **publishable** test key (`pk_test_...`). Leave blank to
+  use the Mock provider only. (The publishable key is safe client-side by design; the secret
+  key never leaves the server.)
+
+**Deployment:** deployed on Vercel with root directory `frontend` and framework preset "Other"
+(static, no build step). CORS on the backend is env-driven via `CORS_ORIGINS`; leave it empty
+in development to allow all origins, or set it to the deployed frontend origin in production.
 
 ---
 
